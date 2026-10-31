@@ -19,7 +19,7 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
-    timeout-minutes: 14
+    timeout-minutes: 12
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
@@ -40,6 +40,8 @@ jobs:
         run: |
           node -e "const fs=require('fs'),p=require('path');const b=JSON.parse(fs.readFileSync('bundle.json','utf8'));for(const [f,v] of Object.entries(b.files)){fs.mkdirSync(p.dirname(f),{recursive:true});fs.writeFileSync(f,v.b64?Buffer.from(v.b64,'base64'):v.text);}console.log('files',Object.keys(b.files).length,'v'+b.version)"
           cp lib/*.js site/
+      - name: 접속 진단
+        run: node scraper/run.mjs --diag || true
       - name: 영화관 데이터 수집
         run: node scraper/run.mjs
       - name: 수집 상태 저장
