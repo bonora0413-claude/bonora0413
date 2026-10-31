@@ -1,0 +1,56 @@
+name: 굿즈 데이터 갱신 및 배포
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'   # 15분마다 (GitHub 사정으로 몇 분 늦어질 수 있음)
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    env:
+      TZ: Asia/Seoul
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: 이전 수집 상태(재고 이력·학습값) 불러오기
+        uses: actions/cache/restore@v4
+        with:
+          path: state
+          key: state-${{ github.run_id }}
+          restore-keys: state-
+      - name: 코드 묶음(bundle.json) 풀기
+        run: |
+          node -e "const fs=require('fs'),p=require('path');const b=JSON.parse(fs.readFileSync('bundle.json','utf8'));for(const [f,v] of Object.entries(b.files)){fs.mkdirSync(p.dirname(f),{recursive:true});fs.writeFileSync(f,v.b64?Buffer.from(v.b64,'base64'):v.text);}console.log('files',Object.keys(b.files).length,'v'+b.version)"
+          cp lib/*.js site/
+      - name: 영화관 데이터 수집
+        run: node scraper/run.mjs
+      - name: 수집 상태 저장
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: state
+          key: state-${{ github.run_id }}
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4
